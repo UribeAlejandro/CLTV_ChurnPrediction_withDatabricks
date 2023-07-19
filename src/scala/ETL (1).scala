@@ -1,17 +1,6 @@
 // Databricks notebook source
 // DBTITLE 1,Import required libraries
-
-
-// COMMAND ----------
-
-import java.nio.file.{FileSystems, Files}
-import scala.collection.JavaConverters._
-
-// COMMAND ----------
-
-// DBTITLE 1,Get environment variables
-// MAGIC %python
-// MAGIC output_directory = dbutils.jobs.taskValues.get(taskKey = "Setup_Env", key = "path_data")
+import org.apache.spark.sql.types.{IntegerType,StringType,StructType,StructField,DateType, DoubleType}
 
 // COMMAND ----------
 
@@ -22,78 +11,44 @@ import scala.collection.JavaConverters._
 // COMMAND ----------
 
 // DBTITLE 1,Download Data Set
-val output_directory = "/dbfs/tmp/clv/online_retail/"
-val url = "http://archive.ics.uci.edu/ml/machine-learning-databases/00352/Online%20Retail.xlsx"
-
-// xlsx_filename = wget.download(url, out=output_directory)
-// print(xlsx_filename)
+val output_directory = "dbfs:/tmp/clv/online_retail/Online%20Retail.xlsx"
 
 // COMMAND ----------
 
-val dir = FileSystems.getDefault.getPath(output_directory)
-
-// COMMAND ----------
-
-var file_path = ""
-val filesSeq = Files.list(dir).iterator().asScala.filter(_.getFileName.toString().endsWith(".xlsx")).toSeq
-// val filesSeqString = filesSeq.foreach(_.toAbsolutePath().toString())
-// if (filesSeq.isEmpty) {
-//   throw new RuntimeException("No file was found")
-// } else {
-//   file_path = filesSeq(0)
-// }
-
-// COMMAND ----------
-
-val file_path = filesSeq(0).toString()
-
-// COMMAND ----------
-
-// MAGIC %md The dataset is made available as an Excel spreadsheet.  We can read this data to a pandas dataframe as follows:
-
-// COMMAND ----------
-
-import org.apache.spark.sql.types.{IntegerType,StringType,StructType,StructField,DateType, DoubleType}
-
-val simpleSchema = StructType(Array(
-    StructField("InvoiceNo",StringType,true),
-    StructField("StockCode",StringType,true),
-    StructField("Description",StringType,true),
+val onlineRetailSchema = StructType(
+  Array(
+    StructField("InvoiceNo", StringType,true),
+    StructField("StockCode", StringType,true),
+    StructField("Description", StringType,true),
     StructField("Quantity", IntegerType, true),
     StructField("InvoiceDate", DateType, true),
     StructField("UnitPrice", DoubleType, true),
     StructField("CustomerID", StringType, true),
     StructField("Country", StringType, true)
-  ))
-
-// COMMAND ----------
-
-// MAGIC %sh
-// MAGIC cd ..
-// MAGIC pwd
+  )
+)
 
 // COMMAND ----------
 
 val df = spark.read.format("com.crealytics.spark.excel")
 .option("header", true)
-.option("inferSchema", "true")
-.load("~/dbfs/tmp/clv/online_retail/Online%20Retail (1).xlsx")
+.option("sheet_name", "Online Retail")
+.schema(onlineRetailSchema)
+.load(output_directory)
 
 // COMMAND ----------
 
-filesSeq(0)
+df.printSchema()
 
 // COMMAND ----------
 
+import org.apache.spark.sql.functions.col
+import org.apache.spark.sql.functions.lit
+
+display(df.withColumn("SalesAmount", col("Quantity")*col("UnitPrice")))
 
 
-// COMMAND ----------
-
-
-
-// COMMAND ----------
-
-
+// df.withColumn("SalesAmount", lit(1))
 
 // COMMAND ----------
 

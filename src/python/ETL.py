@@ -1,55 +1,34 @@
 # Databricks notebook source
-# MAGIC %md 
-# MAGIC You may find this series of notebooks at https://github.com/databricks-industry-solutions/customer-lifetime-value. For more information about this solution accelerator, visit https://www.databricks.com/solutions/accelerators/customer-lifetime-value.
-
-# COMMAND ----------
-
-# MAGIC %md 
-# MAGIC ##Introduction
-# MAGIC
-# MAGIC In non-subscription retail models, customers come and go with no long-term commitments, making it very difficult to determine whether a customer will return in the future. In addition, customers frequently settle into a pattern of regular spend with retailers with whom they maintain a long-term relationship.  But occasionally, customers will spend at higher rates before returning back to their previous norm.  Both of these patterns make effective projections of customer spending very challenging for most retail organizations.
-# MAGIC
-# MAGIC The *Buy 'til You Die* (BTYD) models popularized by Peter Fader and others leverage a few basic customer metrics, *i.e.* the recency of a customer's last engagement, the frequency of repeat transactions over a customer's lifetime, the average monetary spend associated with those transactions, and the length (term) of a customer's time engaged with a retailer to derive probabilistic estimations of both a customer's future spend and that customer's likelihood to remain engaged.  Using these values, we can project likely future spend, a value we frequently refer to as the customer's lifetime value (CLV).
-# MAGIC
-# MAGIC The math behind this approach is fairly complex but thankfully it's been encapsulated in the [btyd](https://pypi.org/project/btyd/) library, making it much easier for traditional enterprises to employ. The purpose of this notebook is to examine how these models may be applied to customer transaction history to estimate CLV.
-# MAGIC
-# MAGIC In this notebook, we are going to create two models that are used to estimate lifetime value.  The first of these will be used to estimate the probability of customer retention through a certain point in time.  The second will be used to calculate the estimated monetary value through that same point in time.  Together, these estimates can be combined to calculate a customer's value through and extended period of time.
-
-# COMMAND ----------
-
-# MAGIC %pip install btyd
-# MAGIC %pip install numba
 # MAGIC %pip install wget
+# MAGIC %pip install openpyxl
 
 # COMMAND ----------
 
 # DBTITLE 1,Import required libraries
 import wget
-import pandas as pd
-import numpy as np
-from datetime import timedelta
-
-import btyd
-from btyd.fitters.beta_geo_fitter import BetaGeoFitter
-from btyd import GammaGammaFitter
-
-from btyd.plotting import plot_calibration_purchases_vs_holdout_purchases
-from btyd.plotting import plot_probability_alive_matrix
-from btyd.plotting import plot_frequency_recency_matrix
-
-import matplotlib.pyplot as plt
-
-import pyspark.sql.functions as fn
-from pyspark.sql.types import *
 import pyspark.pandas as ps
+# import pandas as pd
 
-import mlflow.pyfunc
-import mlflow
 
-# COMMAND ----------
+import numpy as np
+# from datetime import timedelta
 
-# DBTITLE 1,Get environment variables
-output_directory = dbutils.jobs.taskValues.get(taskKey = "Setup_Env", key = "path_data")
+# import btyd
+# from btyd.fitters.beta_geo_fitter import BetaGeoFitter
+# from btyd import GammaGammaFitter
+
+# from btyd.plotting import plot_calibration_purchases_vs_holdout_purchases
+# from btyd.plotting import plot_probability_alive_matrix
+# from btyd.plotting import plot_frequency_recency_matrix
+
+# import matplotlib.pyplot as plt
+
+# import pyspark.sql.functions as fn
+# from pyspark.sql.types import *
+# import pyspark.pandas as ps
+
+# import mlflow.pyfunc
+# import mlflow
 
 # COMMAND ----------
 
@@ -59,12 +38,25 @@ output_directory = dbutils.jobs.taskValues.get(taskKey = "Setup_Env", key = "pat
 
 # COMMAND ----------
 
+dbutils.help()
+
+# COMMAND ----------
+
+dbutils.jobs.taskValues.get(taskKey="Setup_env", key="path_data", default="/dbfs/tmp/clv/online_retail/", debugValue="/dbfs/tmp/clv/online_retail/")
+
+# COMMAND ----------
+
 # DBTITLE 1,Download Data Set
 output_directory = "/dbfs/tmp/clv/online_retail/"
 url = "http://archive.ics.uci.edu/ml/machine-learning-databases/00352/Online%20Retail.xlsx"
 
 xlsx_filename = wget.download(url, out=output_directory)
+xlsx_filename.replace()
 print(xlsx_filename)
+
+# COMMAND ----------
+
+dbutils.fs.ls("dbfs:/tmp/clv/online_retail")
 
 # COMMAND ----------
 
@@ -83,22 +75,30 @@ orders_schema = {
   'UnitPrice':np.float64,
   'CustomerID':str,
   'Country':str  
-  }
+}
+
+orders_pd = ps.read_excel(
+    "dbfs:/tmp/clv/online_retail/Online%20Retail (1).xlsx", 
+    sheet_name='Online Retail',
+    header=0,
+    dtype=orders_schema
+)
 
 # read spreadsheet to pandas dataframe
 # the xlrd library must be installed for this step to work 
-orders_pd = pd.read_excel(
-  xlsx_filename, 
-  sheet_name='Online Retail',
-  header=0, # first row is header
-  dtype=orders_schema
-  )
+# orders_pd = pd.read_excel(
+#   xlsx_filename, 
+#   sheet_name='Online Retail',
+#   header=0, # first row is header
+#   dtype=orders_schema
+#   )
 
-# calculate sales amount as quantity * unit price
-orders_pd['SalesAmount'] = orders_pd['Quantity'] * orders_pd['UnitPrice']
+# # calculate sales amount as quantity * unit price
+orders_pd = orders_pd.withColumn("x4", col('Quantity')*col('UnitPrice'))
+# orders_pd['SalesAmount'] = orders_pd['Quantity'] * orders_pd['UnitPrice']
 
-# display first few rows from the dataset
-orders_pd.head(10)
+# # display first few rows from the dataset
+orders_pd.show()
 
 # COMMAND ----------
 
