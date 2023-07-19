@@ -17,14 +17,14 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,Install Required Libraries
 # MAGIC %pip install btyd
-# MAGIC %pip install openpyxl==3.1.2
-# MAGIC dbutils.library.restartPython()
+# MAGIC %pip install numba
+# MAGIC %pip install wget
 
 # COMMAND ----------
 
-# DBTITLE 1,Install Required Libraries
+# DBTITLE 1,Import required libraries
+import wget
 import pandas as pd
 import numpy as np
 from datetime import timedelta
@@ -41,9 +41,15 @@ import matplotlib.pyplot as plt
 
 import pyspark.sql.functions as fn
 from pyspark.sql.types import *
+import pyspark.pandas as ps
 
 import mlflow.pyfunc
 import mlflow
+
+# COMMAND ----------
+
+# DBTITLE 1,Get environment variables
+output_directory = dbutils.jobs.taskValues.get(taskKey = "Setup_Env", key = "path_data")
 
 # COMMAND ----------
 
@@ -54,13 +60,11 @@ import mlflow
 # COMMAND ----------
 
 # DBTITLE 1,Download Data Set
-# MAGIC %sh 
-# MAGIC
-# MAGIC rm -rf /dbfs/tmp/clv/online_retail  # drop any old copies of data
-# MAGIC mkdir -p /dbfs/tmp/clv/online_retail # ensure destination folder exists
-# MAGIC
-# MAGIC # download data to destination folder
-# MAGIC wget -N http://archive.ics.uci.edu/ml/machine-learning-databases/00352/Online%20Retail.xlsx -P /dbfs/tmp/clv/online_retail
+output_directory = "/dbfs/tmp/clv/online_retail/"
+url = "http://archive.ics.uci.edu/ml/machine-learning-databases/00352/Online%20Retail.xlsx"
+
+xlsx_filename = wget.download(url, out=output_directory)
+print(xlsx_filename)
 
 # COMMAND ----------
 
@@ -69,8 +73,6 @@ import mlflow
 # COMMAND ----------
 
 # DBTITLE 1,Read Data
-xlsx_filename = "/dbfs/tmp/clv/online_retail/Online Retail.xlsx"
-
 # schema of the excel spreadsheet data range
 orders_schema = {
   'InvoiceNo':str,
